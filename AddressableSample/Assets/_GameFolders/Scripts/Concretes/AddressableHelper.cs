@@ -185,6 +185,29 @@ public static class AddressableHelper
         }
     }
 
+    public static async UniTask UnloadSceneAsync(
+        SceneInstance sceneInstance,
+        CancellationToken cancellationToken = default)
+    {
+        if (!sceneInstance.Scene.IsValid() || !sceneInstance.Scene.isLoaded)
+        {
+            return;
+        }
+
+        var unloadHandle = Addressables.UnloadSceneAsync(sceneInstance, autoReleaseHandle: false);
+        try
+        {
+            await WaitForHandle(unloadHandle, progress: null, cancellationToken);
+        }
+        finally
+        {
+            if (unloadHandle.IsValid())
+            {
+                Addressables.Release(unloadHandle);
+            }
+        }
+    }
+
     private static async UniTask<GameObject> CompleteInstantiateHandle(
         AsyncOperationHandle<GameObject> handle,
         CancellationToken cancellationToken)

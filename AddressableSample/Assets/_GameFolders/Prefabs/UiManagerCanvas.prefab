@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 285417957147440772}
   - component: {fileID: 7260580607802190216}
   m_Layer: 5
-  m_Name: Text (TMP)
+  m_Name: StartText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -769,7 +769,7 @@ RectTransform:
   m_GameObject: {fileID: 4582740381850796398}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1590703824397716875}
@@ -857,6 +857,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b103db4c48354425bada37d1f1c2131a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UiManager
+  menuRoot: {fileID: 6910999757150037213}
+  gameRoot: {fileID: 8268531904818586744}
+  loadingRoot: {fileID: 5243543551592775017}
+  startButton: {fileID: 1968961154126157212}
+  backButton: {fileID: 5377274784596393614}
+  nextButton: {fileID: 3654888477826536292}
+  startButtonText: {fileID: 7260580607802190216}
+  nextButtonText: {fileID: 3691414079860797330}
+  loadingText: {fileID: 9017856670701978488}
 --- !u!1 &7009300992180109371
 GameObject:
   m_ObjectHideFlags: 0
@@ -1127,7 +1136,7 @@ GameObject:
   - component: {fileID: 5258846017672417257}
   - component: {fileID: 3691414079860797330}
   m_Layer: 5
-  m_Name: Text (TMP)
+  m_Name: NextText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
