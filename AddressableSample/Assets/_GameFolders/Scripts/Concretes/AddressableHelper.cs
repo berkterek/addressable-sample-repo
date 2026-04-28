@@ -4,9 +4,36 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceProviders;
+using UnityEngine.SceneManagement;
 
 public static class AddressableHelper
 {
+    public static async UniTask<int> GetLocationCountAsync(
+        object key,
+        Type type = null,
+        CancellationToken cancellationToken = default)
+    {
+        var locationsHandle = Addressables.LoadResourceLocationsAsync(key, type);
+        try
+        {
+            await WaitForHandle(locationsHandle, progress: null, cancellationToken);
+            return locationsHandle.Result?.Count ?? 0;
+        }
+        finally
+        {
+            Addressables.Release(locationsHandle);
+        }
+    }
+
+    public static UniTask<int> GetLabelCountAsync(
+        string label,
+        Type type = null,
+        CancellationToken cancellationToken = default)
+    {
+        return GetLocationCountAsync(label, type, cancellationToken);
+    }
+
     public static async UniTask DownloadDependenciesAsync(
         object key,
         IProgress<float> progress = null,
@@ -112,6 +139,50 @@ public static class AddressableHelper
     public static bool ReleaseInstance(GameObject instance)
     {
         return instance != null && Addressables.ReleaseInstance(instance);
+    }
+
+    public static async UniTask<SceneInstance> DownloadAndLoadSceneAsync(
+        string address,
+        LoadSceneMode loadMode = LoadSceneMode.Additive,
+        bool activateOnLoad = true,
+        int priority = 100,
+        IProgress<float> progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await DownloadAndLoadSceneAsync(
+            (object)address,
+            loadMode,
+            activateOnLoad,
+            priority,
+            progress,
+            cancellationToken);
+    }
+
+    public static async UniTask<SceneInstance> DownloadAndLoadSceneAsync(
+        object key,
+        LoadSceneMode loadMode = LoadSceneMode.Additive,
+        bool activateOnLoad = true,
+        int priority = 100,
+        IProgress<float> progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        await DownloadDependenciesAsync(key, progress, cancellationToken);
+
+        var sceneHandle = Addressables.LoadSceneAsync(key, loadMode, activateOnLoad, priority);
+        try
+        {
+            await WaitForHandle(sceneHandle, progress: null, cancellationToken);
+            return sceneHandle.Result;
+        }
+        catch
+        {
+            if (sceneHandle.IsValid())
+            {
+                Addressables.Release(sceneHandle);
+            }
+
+            throw;
+        }
     }
 
     private static async UniTask<GameObject> CompleteInstantiateHandle(
