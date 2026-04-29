@@ -3,37 +3,22 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.Events;
 using UnityEngine.Networking;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceLocations;
-using UnityEngine.SceneManagement;
 
-[DisallowMultipleComponent]
-public class RemoteConfigLoader : MonoBehaviour
+public sealed class RemoteConfigLoader
 {
-    private const string DefaultConfigUrl = "https://s3.amazonaws.com/mybucket/config.json";
+    private const string ProductionConfigUrl = "https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/production/config.json";
+    private const string StagingConfigUrl = "https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/config.json";
 
-    [Header("Remote Config")]
-    [SerializeField] private string configUrl = DefaultConfigUrl;
-    [SerializeField] private int requestTimeoutSeconds = 15;
-    [SerializeField] private bool startOnAwake = true;
-
-    [Header("Scene")]
-    [SerializeField] private bool loadMainSceneAfterCatalog = true;
-    [SerializeField] private string mainSceneName = "Game";
-    [SerializeField] private LoadSceneMode mainSceneLoadMode = LoadSceneMode.Single;
-
-    [Header("Loading Events")]
-    [SerializeField] private RemoteConfigStatusEvent onStatusChanged = new RemoteConfigStatusEvent();
-    [SerializeField] private RemoteConfigProgressEvent onProgressChanged = new RemoteConfigProgressEvent();
-    [SerializeField] private RemoteConfigLoadedEvent onConfigLoaded = new RemoteConfigLoadedEvent();
-    [SerializeField] private RemoteCatalogLoadedEvent onCatalogLoaded = new RemoteCatalogLoadedEvent();
-    [SerializeField] private RemoteConfigFailedEvent onFailed = new RemoteConfigFailedEvent();
-    [SerializeField] private UnityEvent onCompleted = new UnityEvent();
-
-    private CancellationTokenSource cancellationTokenSource;
+    private readonly int requestTimeoutSeconds;
     private bool isLoading;
+
+    public RemoteConfigLoader(int requestTimeoutSeconds = 15)
+    {
+        this.requestTimeoutSeconds = Mathf.Max(1, requestTimeoutSeconds);
+    }
 
     public event Action<string> StatusChanged;
     public event Action<float> ProgressChanged;
@@ -43,38 +28,20 @@ public class RemoteConfigLoader : MonoBehaviour
     public event Action Completed;
 
     public bool IsLoading => isLoading;
-    public string ConfigUrl => configUrl;
 
-    private void Awake()
+    public string ConfigUrl
     {
-        if (startOnAwake)
+        get
         {
-            LoadAsync().Forget();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            return StagingConfigUrl;
+#else
+            return ProductionConfigUrl;
+#endif
         }
     }
 
-    private void OnDestroy()
-    {
-        cancellationTokenSource?.Cancel();
-        cancellationTokenSource?.Dispose();
-        cancellationTokenSource = null;
-    }
-
-    public async UniTask LoadAsync()
-    {
-        if (isLoading)
-        {
-            return;
-        }
-
-        cancellationTokenSource?.Cancel();
-        cancellationTokenSource?.Dispose();
-        cancellationTokenSource = new CancellationTokenSource();
-
-        await LoadAsync(cancellationTokenSource.Token);
-    }
-
-    public async UniTask LoadAsync(CancellationToken cancellationToken)
+    public async UniTask LoadAsync(CancellationToken cancellationToken = default)
     {
         if (isLoading)
         {
@@ -93,6 +60,7 @@ public class RemoteConfigLoader : MonoBehaviour
                     "Internet connection is not available.");
             }
 
+            var configUrl = ConfigUrl;
             if (string.IsNullOrWhiteSpace(configUrl))
             {
                 throw new RemoteConfigException(
@@ -113,12 +81,6 @@ public class RemoteConfigLoader : MonoBehaviour
             ReportStatus("Addressables catalog yukleniyor...");
             await LoadAddressablesCatalogAsync(platformConfig.catalog_url, cancellationToken);
             ReportCatalogLoaded(platformConfig.catalog_url);
-            ReportProgress(0.85f);
-
-            if (loadMainSceneAfterCatalog)
-            {
-                await LoadMainSceneAsync(cancellationToken);
-            }
 
             ReportProgress(1f);
             ReportStatus("Hazir.");
@@ -130,10 +92,12 @@ public class RemoteConfigLoader : MonoBehaviour
                 RemoteConfigErrorType.Cancelled,
                 "Remote config loading was cancelled.",
                 null));
+            throw;
         }
         catch (RemoteConfigException exception)
         {
             ReportFailed(new RemoteConfigLoadError(exception.ErrorType, exception.Message, exception));
+            throw;
         }
         catch (Exception exception)
         {
@@ -141,6 +105,7 @@ public class RemoteConfigLoader : MonoBehaviour
                 RemoteConfigErrorType.Unknown,
                 exception.Message,
                 exception));
+            throw;
         }
         finally
         {
@@ -151,7 +116,7 @@ public class RemoteConfigLoader : MonoBehaviour
     private async UniTask<string> DownloadTextAsync(string url, CancellationToken cancellationToken)
     {
         using var request = UnityWebRequest.Get(url);
-        request.timeout = Mathf.Max(1, requestTimeoutSeconds);
+        request.timeout = requestTimeoutSeconds;
 
         var operation = request.SendWebRequest();
         while (!operation.isDone)
@@ -293,67 +258,34 @@ public class RemoteConfigLoader : MonoBehaviour
         }
     }
 
-    private async UniTask LoadMainSceneAsync(CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(mainSceneName))
-        {
-            throw new RemoteConfigException(
-                RemoteConfigErrorType.MainSceneLoadFailed,
-                "Main scene name is empty.");
-        }
-
-        ReportStatus("Ana sahne aciliyor...");
-        var operation = SceneManager.LoadSceneAsync(mainSceneName, mainSceneLoadMode);
-        if (operation == null)
-        {
-            throw new RemoteConfigException(
-                RemoteConfigErrorType.MainSceneLoadFailed,
-                $"Main scene could not be loaded: {mainSceneName}");
-        }
-
-        while (!operation.isDone)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ReportProgress(Mathf.Lerp(0.85f, 1f, operation.progress));
-            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
-        }
-    }
-
     private void ReportStatus(string message)
     {
-        onStatusChanged.Invoke(message);
         StatusChanged?.Invoke(message);
     }
 
     private void ReportProgress(float progress)
     {
-        progress = Mathf.Clamp01(progress);
-        onProgressChanged.Invoke(progress);
-        ProgressChanged?.Invoke(progress);
+        ProgressChanged?.Invoke(Mathf.Clamp01(progress));
     }
 
     private void ReportConfigLoaded(RemoteCatalogConfig config)
     {
-        onConfigLoaded.Invoke(config);
         ConfigLoaded?.Invoke(config);
     }
 
     private void ReportCatalogLoaded(string catalogUrl)
     {
-        onCatalogLoaded.Invoke(catalogUrl);
         CatalogLoaded?.Invoke(catalogUrl);
     }
 
     private void ReportFailed(RemoteConfigLoadError error)
     {
         Debug.LogError($"Remote config load failed. Type: {error.ErrorType}, Message: {error.Message}");
-        onFailed.Invoke(error);
         Failed?.Invoke(error);
     }
 
     private void ReportCompleted()
     {
-        onCompleted.Invoke();
         Completed?.Invoke();
     }
 }
@@ -382,7 +314,6 @@ public enum RemoteConfigErrorType
     MissingPlatformConfig,
     MissingCatalogUrl,
     CatalogLoadFailed,
-    MainSceneLoadFailed,
     Cancelled,
     Unknown
 }
@@ -415,29 +346,4 @@ public class RemoteConfigException : Exception
     }
 
     public RemoteConfigErrorType ErrorType { get; }
-}
-
-[Serializable]
-public class RemoteConfigStatusEvent : UnityEvent<string>
-{
-}
-
-[Serializable]
-public class RemoteConfigProgressEvent : UnityEvent<float>
-{
-}
-
-[Serializable]
-public class RemoteConfigLoadedEvent : UnityEvent<RemoteCatalogConfig>
-{
-}
-
-[Serializable]
-public class RemoteCatalogLoadedEvent : UnityEvent<string>
-{
-}
-
-[Serializable]
-public class RemoteConfigFailedEvent : UnityEvent<RemoteConfigLoadError>
-{
 }

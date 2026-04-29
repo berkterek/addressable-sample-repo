@@ -12,6 +12,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] private string levelAddressPrefix = "Level_";
     [SerializeField] private int defaultLevelIndex = 1;
 
+    [Header("Remote Config")]
+    [SerializeField] private EditorAddressablesMode editorAddressablesMode = EditorAddressablesMode.Local;
+    [SerializeField] private int remoteConfigRequestTimeoutSeconds = 15;
+
     [Header("References")]
     [SerializeField] private UiManager uiManager;
 
@@ -30,6 +34,7 @@ public class GameManager : MonoBehaviour
 
     private SceneInstance currentLevelSceneInstance;
     private Scene currentLevelScene;
+    private RemoteConfigLoader remoteConfigLoader;
 
     public int TotalLevelCount => totalLevelCount;
     public int CurrentLevelIndex => currentLevelIndex;
@@ -47,11 +52,26 @@ public class GameManager : MonoBehaviour
         {
             uiManager = FindFirstObjectByType<UiManager>();
         }
+
+        remoteConfigLoader = new RemoteConfigLoader(remoteConfigRequestTimeoutSeconds);
+        remoteConfigLoader.StatusChanged += HandleRemoteConfigStatusChanged;
+        remoteConfigLoader.CatalogLoaded += HandleRemoteCatalogLoaded;
     }
 
     private void Start()
     {
         InitializeAsync().Forget();
+    }
+
+    private void OnDestroy()
+    {
+        if (remoteConfigLoader == null)
+        {
+            return;
+        }
+
+        remoteConfigLoader.StatusChanged -= HandleRemoteConfigStatusChanged;
+        remoteConfigLoader.CatalogLoaded -= HandleRemoteCatalogLoaded;
     }
 
     public async UniTask StartCurrentLevelAsync()
@@ -118,9 +138,19 @@ public class GameManager : MonoBehaviour
         {
             isBusy = true;
             uiManager?.Initialize(this);
+
+            if (ShouldLoadRemoteCatalog())
+            {
+                uiManager?.ShowLoading("Loading remote config...");
+                await remoteConfigLoader.LoadAsync(this.GetCancellationTokenOnDestroy());
+            }
+            else
+            {
+                Debug.Log("Using local Editor Addressables catalog.");
+            }
+
             uiManager?.ShowLoading("Reading levels...");
             LogMemory("Before Read Levels");
-
             totalLevelCount = await AddressableHelper.GetLabelCountAsync(levelLabel);
             currentLevelIndex = Mathf.Clamp(defaultLevelIndex, 1, Mathf.Max(1, totalLevelCount));
             currentLevelAddress = GetLevelAddress(currentLevelIndex);
@@ -206,6 +236,25 @@ public class GameManager : MonoBehaviour
         return $"{levelAddressPrefix}{levelIndex}";
     }
 
+    private bool ShouldLoadRemoteCatalog()
+    {
+#if UNITY_EDITOR
+        return editorAddressablesMode == EditorAddressablesMode.Remote;
+#else
+        return true;
+#endif
+    }
+
+    private void HandleRemoteConfigStatusChanged(string status)
+    {
+        uiManager?.ShowLoading(status);
+    }
+
+    private void HandleRemoteCatalogLoaded(string catalogUrl)
+    {
+        Debug.Log($"Remote Addressables catalog loaded: {catalogUrl}");
+    }
+
     private void RefreshCurrentLevelSceneInfo()
     {
         currentLevelSceneLoaded = currentLevelScene.IsValid() && currentLevelScene.isLoaded;
@@ -240,4 +289,10 @@ public class GameManager : MonoBehaviour
         const double megabyte = 1024d * 1024d;
         return $"{bytes / megabyte:0.00} MB";
     }
+}
+
+public enum EditorAddressablesMode
+{
+    Local,
+    Remote
 }

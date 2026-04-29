@@ -1,8 +1,8 @@
 {
   "android": {
-    "catalog_url": "https://s3.amazonaws.com/mybucket/production/android/v1.0/catalog.json"
+    "catalog_url": "https://terek-addressables-sample-prod.s3.amazonaws.com/android/v1.0/catalog.json"
   },
   "ios": {
-    "catalog_url": "https://s3.amazonaws.com/mybucket/production/ios/v1.0/catalog.json"
+    "catalog_url": "https://terek-addressables-sample-prod.s3.amazonaws.com/ios/v1.0/catalog.json"
   }
 }
