@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -32,6 +34,33 @@ public static class AddressableHelper
         CancellationToken cancellationToken = default)
     {
         return GetLocationCountAsync(label, type, cancellationToken);
+    }
+
+    public static async UniTask<List<string>> GetUniqueAddressesByLabelAsync(
+        string label,
+        Type type = null,
+        CancellationToken cancellationToken = default)
+    {
+        var locationsHandle = Addressables.LoadResourceLocationsAsync(label, type);
+        try
+        {
+            await WaitForHandle(locationsHandle, progress: null, cancellationToken);
+
+            if (locationsHandle.Result == null)
+            {
+                return new List<string>();
+            }
+
+            return locationsHandle.Result
+                .Select(location => location.PrimaryKey)
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }
+        finally
+        {
+            Addressables.Release(locationsHandle);
+        }
     }
 
     public static async UniTask DownloadDependenciesAsync(

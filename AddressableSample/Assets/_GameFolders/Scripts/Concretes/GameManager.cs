@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -35,6 +36,7 @@ public class GameManager : MonoBehaviour
     private SceneInstance currentLevelSceneInstance;
     private Scene currentLevelScene;
     private RemoteConfigLoader remoteConfigLoader;
+    private readonly List<string> levelAddresses = new();
 
     public int TotalLevelCount => totalLevelCount;
     public int CurrentLevelIndex => currentLevelIndex;
@@ -42,9 +44,9 @@ public class GameManager : MonoBehaviour
     public Scene CurrentLevelScene => currentLevelScene;
     public bool IsBusy => isBusy;
     public bool HasCurrentLevelLoaded => currentLevelScene.IsValid() && currentLevelScene.isLoaded;
-    public bool HasNextLevel => currentLevelIndex > 0 && currentLevelIndex < totalLevelCount;
-    public int NextLevelIndex => HasNextLevel ? currentLevelIndex + 1 : 0;
-    public string NextLevelAddress => HasNextLevel ? GetLevelAddress(NextLevelIndex) : string.Empty;
+    public bool HasNextLevel => GetCurrentLevelListIndex() >= 0 && GetCurrentLevelListIndex() < levelAddresses.Count - 1;
+    public string NextLevelAddress => HasNextLevel ? levelAddresses[GetCurrentLevelListIndex() + 1] : string.Empty;
+    public int NextLevelIndex => HasNextLevel ? GetLevelIndexFromAddress(NextLevelAddress) : 0;
 
     private void Awake()
     {
@@ -87,7 +89,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        await LoadLevelAsync(currentLevelIndex);
+        await LoadLevelAsync(currentLevelAddress);
     }
 
     public async UniTask ReturnToMenuAsync()
@@ -129,7 +131,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        await LoadLevelAsync(NextLevelIndex);
+        await LoadLevelAsync(NextLevelAddress);
     }
 
     private async UniTaskVoid InitializeAsync()
@@ -151,12 +153,15 @@ public class GameManager : MonoBehaviour
 
             uiManager?.ShowLoading("Reading levels...");
             LogMemory("Before Read Levels");
-            totalLevelCount = await AddressableHelper.GetLabelCountAsync(levelLabel);
-            currentLevelIndex = Mathf.Clamp(defaultLevelIndex, 1, Mathf.Max(1, totalLevelCount));
-            currentLevelAddress = GetLevelAddress(currentLevelIndex);
+            levelAddresses.Clear();
+            levelAddresses.AddRange(await AddressableHelper.GetUniqueAddressesByLabelAsync(levelLabel));
+            levelAddresses.Sort(CompareLevelAddresses);
+            totalLevelCount = levelAddresses.Count;
+            currentLevelAddress = GetDefaultLevelAddress();
+            currentLevelIndex = GetLevelIndexFromAddress(currentLevelAddress);
             ClearCurrentLevelSceneInfo();
 
-            Debug.Log($"Total level count from Addressables label '{levelLabel}': {totalLevelCount}");
+            Debug.Log($"Total level count from Addressables label '{levelLabel}': {totalLevelCount}. Addresses: {string.Join(", ", levelAddresses)}");
             LogMemory("After Read Levels");
             uiManager?.ShowMenu(this);
         }
@@ -172,18 +177,24 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private async UniTask LoadLevelAsync(int levelIndex)
+    private async UniTask LoadLevelAsync(string levelAddress)
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(levelAddress))
+            {
+                throw new InvalidOperationException("Level address is empty.");
+            }
+
             isBusy = true;
+            var levelIndex = GetLevelIndexFromAddress(levelAddress);
             uiManager?.ShowLoading($"Loading Level {levelIndex}...");
-            LogMemory($"Before Load {GetLevelAddress(levelIndex)}");
+            LogMemory($"Before Load {levelAddress}");
 
             await UnloadCurrentLevelAsync();
 
             currentLevelIndex = levelIndex;
-            currentLevelAddress = GetLevelAddress(currentLevelIndex);
+            currentLevelAddress = levelAddress;
             currentLevelSceneInstance = await AddressableHelper.DownloadAndLoadSceneAsync(
                 currentLevelAddress,
                 LoadSceneMode.Additive);
@@ -231,9 +242,53 @@ public class GameManager : MonoBehaviour
         ClearCurrentLevelSceneInfo();
     }
 
-    private string GetLevelAddress(int levelIndex)
+    private string GetDefaultLevelAddress()
     {
-        return $"{levelAddressPrefix}{levelIndex}";
+        if (levelAddresses.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var preferredAddress = $"{levelAddressPrefix}{defaultLevelIndex}";
+        return levelAddresses.Contains(preferredAddress) ? preferredAddress : levelAddresses[0];
+    }
+
+    private int GetCurrentLevelListIndex()
+    {
+        return string.IsNullOrWhiteSpace(currentLevelAddress) ? -1 : levelAddresses.IndexOf(currentLevelAddress);
+    }
+
+    private int GetLevelIndexFromAddress(string levelAddress)
+    {
+        if (string.IsNullOrWhiteSpace(levelAddress) || !levelAddress.StartsWith(levelAddressPrefix, StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        var suffix = levelAddress.Substring(levelAddressPrefix.Length);
+        return int.TryParse(suffix, out var levelIndex) ? levelIndex : 0;
+    }
+
+    private int CompareLevelAddresses(string left, string right)
+    {
+        var leftIndex = GetLevelIndexFromAddress(left);
+        var rightIndex = GetLevelIndexFromAddress(right);
+        if (leftIndex > 0 && rightIndex > 0)
+        {
+            return leftIndex.CompareTo(rightIndex);
+        }
+
+        if (leftIndex > 0)
+        {
+            return -1;
+        }
+
+        if (rightIndex > 0)
+        {
+            return 1;
+        }
+
+        return string.Compare(left, right, StringComparison.Ordinal);
     }
 
     private bool ShouldLoadRemoteCatalog()
