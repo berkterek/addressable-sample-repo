@@ -1,8 +1,8 @@
 {
   "android": {
-    "catalog_url": "https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/Android/v1.0/catalog_0.1.0.bin"
+    "catalog_url": "https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/Android/v1.2/catalog_0.1.0.bin"
   },
   "ios": {
-    "catalog_url": "https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/iOS/v1.0/catalog_0.1.0.bin"
+    "catalog_url": "https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/iOS/v1.2/catalog_0.1.0.bin"
   }
 }

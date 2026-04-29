@@ -15,7 +15,7 @@ MonoBehaviour:
   m_DefaultGroup: 7457711ad073f479c9eaa198bbc3c6a9
   m_currentHash:
     serializedVersion: 2
-    Hash: 00000000000000000000000000000000
+    Hash: 50c9d7711d5aa9ed0362a08ec63a300d
   m_OptimizeCatalogSize: 0
   m_BuildRemoteCatalog: 1
   m_CatalogRequestsTimeout: 0
@@ -60,8 +60,11 @@ MonoBehaviour:
   m_BuildAddressablesWithPlayerBuild: 0
   m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
   m_GroupAssets:
+  - {fileID: 11400000, guid: b98d4ff3e17e44416b15397ea3216e17, type: 2}
   - {fileID: 11400000, guid: 93d35e1aa8c5245d88bdbf75c00b49df, type: 2}
   - {fileID: 11400000, guid: 310226c518966445287200ea4d9aac53, type: 2}
+  - {fileID: 11400000, guid: 70c00400d37954a62b354a8685bcd036, type: 2}
+  - {fileID: 11400000, guid: 3cc3adae9c4bf4c62933699b63dcf562, type: 2}
   - {fileID: 11400000, guid: be00e09ccf65e49b6a8288bbd972e171, type: 2}
   - {fileID: 11400000, guid: fcfc834310e1c4db4815ce174a9628e9, type: 2}
   m_BuildSettings:
@@ -110,7 +113,7 @@ MonoBehaviour:
       - m_Id: 8ebf8aad04a0d40309473e9a2cb18554
         m_Value: 'ServerData/[BuildTarget]'
       - m_Id: ec6a3218f13884426aa028dafb9f91a1
-        m_Value: https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/[BuildTarget]/v1.0
+        m_Value: https://terek-addressables-sample-prod.s3.us-east-1.amazonaws.com/staging/[BuildTarget]/v1.1
     m_ProfileEntryNames:
     - m_Id: 1ddb203af8a184292af26067db5ead33
       m_Name: Local.LoadPath

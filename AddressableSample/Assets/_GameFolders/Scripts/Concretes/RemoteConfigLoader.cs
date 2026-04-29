@@ -68,22 +68,22 @@ public sealed class RemoteConfigLoader
                     "Remote config URL is empty.");
             }
 
-            ReportStatus("Config indiriliyor...");
+            ReportStatus("Downloading config...");
             var configJson = await DownloadTextAsync(configUrl, cancellationToken);
             ReportProgress(0.35f);
 
-            ReportStatus("Config okunuyor...");
+            ReportStatus("Reading config...");
             var config = ParseConfig(configJson);
             var platformConfig = GetCurrentPlatformConfig(config);
             ReportConfigLoaded(config);
             ReportProgress(0.45f);
 
-            ReportStatus("Addressables catalog yukleniyor...");
+            ReportStatus("Loading Addressables catalog...");
             await LoadAddressablesCatalogAsync(platformConfig.catalog_url, cancellationToken);
             ReportCatalogLoaded(platformConfig.catalog_url);
 
             ReportProgress(1f);
-            ReportStatus("Hazir.");
+            ReportStatus("Ready.");
             ReportCompleted();
         }
         catch (OperationCanceledException)
